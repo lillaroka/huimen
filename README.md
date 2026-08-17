@@ -8,9 +8,11 @@
 
 ## 玩
 
+**▶ 在线玩:https://lillaroka.github.io/huimen/**
+
 | 方式 | 说明 |
 |------|------|
-| **在线玩**(推荐) | GitHub Pages:开启后本页顶部会出现链接,点开即玩 |
+| **在线玩**(推荐) | ↑ 点开即玩,无需下载 |
 | **离线版** | 下载 `huimen-standalone.html`,双击即玩,断网可玩(three.js 已内嵌) |
 
 **需要**:桌面浏览器(Chrome / Edge / Firefox / Safari)+ 键盘鼠标。**不支持**手机平板。
