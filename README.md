@@ -1,6 +1,6 @@
 # 回门 · Hui Men
 
-![game](screenshot-game.png)
+![game](https://lillaroka.github.io/huimen/screenshot-game.png)
 
 > 雨下了一整夜。过世七年的奶奶来信,只有六个字:**「三朝回门,回家来。」**
 
