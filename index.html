@@ -1,0 +1,1631 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>回门 · 雨夜老宅</title>
+<style>
+  html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:#000;
+    font-family:"Songti SC","Noto Serif SC","STSong",serif;color:#cfc9bc;cursor:default;}
+  #app{position:fixed;inset:0;}
+  canvas{display:block;}
+
+  /* ---------- 常驻氛围层 ---------- */
+  #vignette{position:fixed;inset:0;pointer-events:none;z-index:10;
+    background:radial-gradient(ellipse at center, transparent 42%, rgba(0,0,0,.55) 82%, rgba(0,0,0,.9) 100%);}
+  #redflash{position:fixed;inset:0;pointer-events:none;z-index:11;background:#4a0000;opacity:0;transition:opacity .12s;}
+  #whiteflash{position:fixed;inset:0;pointer-events:none;z-index:11;background:#b9c4cf;opacity:0;transition:opacity .3s;}
+  #fader{position:fixed;inset:0;pointer-events:none;z-index:30;background:#000;opacity:0;transition:opacity 1.6s;}
+
+  /* ---------- HUD ---------- */
+  #hud{position:fixed;inset:0;pointer-events:none;z-index:15;opacity:0;transition:opacity 1s;}
+  #crosshair{position:absolute;top:50%;left:50%;width:5px;height:5px;margin:-2.5px 0 0 -2.5px;
+    border-radius:50%;background:rgba(230,225,210,.5);box-shadow:0 0 6px #000;}
+  #ctlHint{position:absolute;bottom:22px;right:26px;font-size:12px;letter-spacing:2px;
+    color:#6d675b;text-shadow:0 1px 3px #000;line-height:1.9;text-align:right;}
+  #ctlHint b{color:#a89d84;font-weight:normal;}
+  #objective{position:absolute;top:22px;left:26px;font-size:14px;letter-spacing:2px;color:#8d867a;text-shadow:0 1px 3px #000;}
+  #notesCount{position:absolute;top:44px;left:26px;font-size:12px;letter-spacing:2px;color:#5d574d;text-shadow:0 1px 3px #000;}
+  #location{position:absolute;top:66px;left:26px;font-size:13px;letter-spacing:3px;color:#7c7466;text-shadow:0 1px 3px #000;}
+  #prompt{position:absolute;bottom:120px;width:100%;text-align:center;font-size:19px;letter-spacing:3px;
+    color:#efe8d8;text-shadow:0 0 8px #000,0 0 18px #000,0 2px 4px #000;opacity:0;transition:opacity .15s;}
+  #subtitle{position:absolute;bottom:64px;width:100%;text-align:center;font-size:19px;letter-spacing:2px;
+    color:#cfc7b8;text-shadow:0 0 10px #000,0 2px 6px #000;opacity:0;transition:opacity .8s;line-height:1.7;}
+  #subtitle.whisper{color:#a8999b;font-style:italic;}
+  #photoHint{position:fixed;bottom:26px;width:100%;text-align:center;font-size:13px;letter-spacing:3px;
+    color:#8d867a;text-shadow:0 1px 3px #000;z-index:16;display:none;pointer-events:none;}
+
+  /* ---------- 纸条 ---------- */
+  #noteOverlay{position:fixed;inset:0;z-index:20;display:none;background:rgba(0,0,0,.72);
+    align-items:center;justify-content:center;}
+  #notePaper{width:min(560px,86vw);max-height:76vh;overflow:auto;background:#161310;border:1px solid #4a3f2f;
+    padding:38px 44px;box-shadow:0 0 60px #000,inset 0 0 80px rgba(0,0,0,.8);}
+  #noteTitle{font-size:15px;letter-spacing:6px;color:#8a7350;margin-bottom:22px;}
+  #noteBody{font-size:16px;line-height:2.1;letter-spacing:1px;color:#c9bfa9;white-space:pre-wrap;}
+  #noteHint{margin-top:28px;font-size:12px;letter-spacing:3px;color:#5d574d;text-align:right;}
+
+  /* ---------- 标题 / 暂停 ---------- */
+  .screen{position:fixed;inset:0;z-index:40;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;background:#000;text-align:center;}
+  #title h1{font-size:88px;letter-spacing:30px;color:#8c1c22;font-weight:400;text-indent:30px;
+    margin:0 0 30px 0;text-shadow:0 0 40px rgba(140,20,30,.55);}
+  #title .poem{font-size:15px;line-height:2.4;letter-spacing:3px;color:#77705f;margin-bottom:56px;}
+  #title .start{font-size:15px;letter-spacing:8px;color:#b7ae9c;border:1px solid #4a4335;padding:14px 42px;
+    cursor:pointer;transition:all .4s;}
+  #title .start:hover{color:#e8dfc9;border-color:#8c7a55;box-shadow:0 0 30px rgba(160,130,70,.2);}
+  #title .ctl{margin-top:46px;font-size:12px;letter-spacing:2px;color:#4e483e;}
+  #pause{display:none;cursor:pointer;}
+  #pause h2{font-size:26px;letter-spacing:14px;color:#8d867a;font-weight:400;}
+  #pause p{font-size:13px;letter-spacing:3px;color:#4e483e;}
+  .menuBtn{margin-top:26px;font-size:15px;letter-spacing:5px;color:#b98484;border:1px solid #6a4a4a;
+    padding:12px 30px;cursor:pointer;transition:all .3s;}
+  .menuBtn:hover{color:#f0c0c0;border-color:#a86a6a;box-shadow:0 0 24px rgba(170,90,90,.25);}
+  #freshBtn{display:none;margin-top:22px;}
+
+  /* ---------- 堂屋抉择 ---------- */
+  #choice{position:fixed;inset:0;z-index:25;display:none;background:rgba(0,0,0,.62);
+    flex-direction:column;align-items:center;justify-content:center;}
+  #choice .ct{font-size:15px;letter-spacing:8px;color:#8a7350;margin-bottom:34px;}
+  .copt{width:min(540px,82vw);padding:17px 30px;margin:9px 0;border:1px solid #4a3f2f;cursor:pointer;
+    background:rgba(10,8,6,.88);transition:all .3s;}
+  .copt:hover{border-color:#8c1c22;background:rgba(40,8,10,.75);}
+  .copt h3{margin:0 0 6px;font-size:17px;letter-spacing:3px;color:#d8d2c4;font-weight:normal;}
+  .copt p{margin:0;font-size:13px;letter-spacing:2px;color:#77705f;}
+  .copt .key{color:#8c1c22;margin-right:14px;}
+  .copt.off{opacity:.35;}
+
+  /* ---------- 结局 ---------- */
+  #ending{position:fixed;inset:0;z-index:50;display:none;background:#000;
+    flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:0 10vw;}
+  #endLines{max-width:640px;}
+  #endLines div{font-size:18px;line-height:1.6;letter-spacing:2px;color:#b9b0a0;margin:26px 0;
+    opacity:0;transition:opacity 2.4s;white-space:pre-wrap;}
+  #endLines div.red{color:#8c1c22;}
+  #endBtn{display:none;margin-top:60px;font-size:14px;letter-spacing:8px;color:#8d867a;
+    border:1px solid #3c362c;padding:12px 38px;cursor:pointer;}
+  #endBtn:hover{color:#cfc7b8;border-color:#6a6152;}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="vignette"></div>
+<div id="redflash"></div>
+<div id="whiteflash"></div>
+<div id="fader"></div>
+
+<div id="hud">
+  <div id="crosshair"></div>
+  <div id="ctlHint"><b>W A S D / 方向键</b> · 行走<br><b>鼠标</b> · 转视角 &nbsp;<b>J L</b> · 转头<br><b>E</b> · 互动 &nbsp;&nbsp;<b>Q</b> · 快速回头<br><b>SHIFT</b> · 放轻脚步<br><b>P</b> · 拍照 &nbsp;&nbsp;<b>ESC</b> · 暂停 / 从头再来</div>
+  <div id="objective"></div>
+  <div id="notesCount">纸条 0 / 6</div>
+  <div id="location"></div>
+  <div id="prompt"></div>
+  <div id="subtitle"></div>
+</div>
+<div id="photoHint">拍 照 模 式 · 拖动鼠标取景 · 系统截图(⇧⌘4 / ⇧⌘3)· 按 P 返回</div>
+
+<div id="noteOverlay">
+  <div id="notePaper">
+    <div id="noteTitle"></div>
+    <div id="noteBody"></div>
+    <div id="noteHint">按 E 合上</div>
+  </div>
+</div>
+
+<div id="title" class="screen">
+  <h1>回 门</h1>
+  <div class="poem">雨,下了一整夜。<br>奶奶的信只有六个字:<br>「三朝回门,回家来。」<br><br>可奶奶,已经过世七年了。</div>
+  <div class="start" id="startBtn">点 击 回 家</div>
+  <div class="menuBtn" id="freshBtn">从 头 再 来(抹掉进度)</div>
+  <div class="ctl">鼠标 视角(<span style="color:#b7ae9c">J / L 也可转头</span>) &nbsp;·&nbsp; W A S D 行走 &nbsp;·&nbsp; E 互动 &nbsp;·&nbsp; <span style="color:#b7ae9c">Q 快速回头</span> &nbsp;·&nbsp; SHIFT 放轻脚步 &nbsp;·&nbsp; <span style="color:#b7ae9c">P 拍照</span> &nbsp;·&nbsp; <span style="color:#b7ae9c">ESC 暂停/重来</span><br>建议戴耳机 · 灯光调暗 · 一个人玩</div>
+</div>
+
+<div id="pause" class="screen">
+  <h2>雨还在下</h2>
+  <p>点击屏幕 继续 &nbsp;·&nbsp; 游戏中按 P 拍照 &nbsp;·&nbsp; 或者——</p>
+  <div class="menuBtn" id="restartBtn">从 头 再 来(抹掉进度)</div>
+</div>
+
+<div id="choice">
+  <div class="ct">供 桌 之 上</div>
+  <div class="copt" data-e="A"><h3><span class="key">壹</span>戴上红盖头</h3><p>红布叠得整整齐齐。很轻,像是等了很久。</p></div>
+  <div class="copt" data-e="B"><h3><span class="key">贰</span>把庚帖凑近香炉的火</h3><p>三炷香烧到一半。火苗在等一样东西。</p></div>
+  <div class="copt" data-e="C" id="optC"><h3><span class="key">叁</span>翻开族谱,拿起笔</h3><p>最后一页,墨迹未干。</p></div>
+  <div class="copt" data-e="X"><h3><span class="key">〇</span>……再想想</h3><p>退后一步。烛火还长。(按 1 / 2 / 3 选择,0 退开)</p></div>
+</div>
+
+<div id="ending">
+  <div id="endLines"></div>
+  <div id="endBtn">再 回 一 次 门</div>
+</div>
+
+<script type="importmap">
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js" } }
+</script>
+<script>
+/* 报错上屏(注册在 module 之前,才能抓到 module 求值期的错误) */
+window.addEventListener('error', e=>{
+  const d=document.createElement('div');
+  d.style.cssText='position:fixed;top:0;left:0;right:0;z-index:99;background:#3a0000;color:#ffaaaa;font-size:13px;padding:8px;white-space:pre-wrap;';
+  d.textContent='ERR: '+e.message+' @'+(e.filename||'')+':'+e.lineno;
+  document.body.appendChild(d);
+});
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+/* ================================================================
+   《回门》—— 东方式心理恐怖 · 单文件
+   全部几何、贴图、音效均为程序化生成,零外部素材。
+
+   ┌ 目录 ──────────────────────────────────────────────┐
+   │ 00 工具 & 配置    随机/贴图工厂/可调参数            │
+   │ 01 全局状态       G(进度) + canPlay()               │
+   │ 02 渲染器         renderer / scene / camera         │
+   │ 03 贴图 & 材质    全部 canvas 程序化                │
+   │ 04 音频           WebAudio 合成 + TTS 耳语          │
+   │ 05 UI             字幕/纸条/闪屏                    │
+   │ 06 世界·房        墙/门/家具/灯/雨(纯几何)          │
+   │ 07 纸人           生成 + 布置                       │
+   │ 08 聘礼 & 纸条实体 三件聘礼 + 六张纸条的可见物      │
+   │ 09 玩家           输入/移动/碰撞/自愈/Q 回头        │
+   │ 10 互动系统       addInteract / pickInteract        │
+   │ 11 剧本数据       纸条文本/结局文本/区域表(纯数据)  │
+   │ 12 剧本逻辑       存档/聘礼/门/抉择/终局/氛围事件   │
+   │ 13 主循环         loop                              │
+   │ 14 启动           标题/暂停/重置/调试入口           │
+   └────────────────────────────────────────────────────┘
+   改文案 → 第 11 节(剧本数据);调手感 → 第 00 节(CFG)。
+   ================================================================ */
+
+/* ============ 00 工具 & 配置 ============ */
+const $  = id => document.getElementById(id);
+const R  = (a,b)=>a+Math.random()*(b-a);
+
+const CFG = {
+  /* 玩家 */
+  eyeHeight:1.6, radius:0.35, walkSpeed:3.1, slowSpeed:1.7,
+  lookSens:0.0021, pitchClamp:1.35, turnDur:0.3,   /* Q 回头时长(秒) */
+  /* 互动 */
+  interactRadius:3.0, doorRadius:3.2, facingDot:0.30,
+  /* 烛 */
+  candleInt:22, candleDist:13, candleBurnMin:0.15, candleBurnSec:1800,
+  /* 事件节奏(秒) */
+  hintAfter:70, hintReset:75, thunderGap:[40,85], whisperGap:[50,90],
+  dlbFirst:75, dlbGap:[70,120], dlbWindow:7, dlbTurnEps:0.7, dlbBehind:1.0,
+  /* 跟踪者 */
+  stalkerSpeed:0.55, stalkerCatch:1.5, stalkerCool:50,
+};
+
+/* ============ 01 全局状态 ============ */
+const G = {
+  running:false, paused:false, noteOpen:false, ended:false, photoMode:false,
+  stage:0,                       /* 聘礼收集数 0..3 */
+  finale:false,                  /* 已入堂屋(终局) */
+  pickups:{jiaYi:false, gengTie:false, xiZhu:false},
+  notesFound:0,
+  radioForced:false,
+  time:0,
+};
+/* "玩家此刻能行动吗":循环、E、Q、互动提示共用同一判据 */
+const canPlay = () => G.running && !G.paused && !G.noteOpen && !G.ended && !choiceOpen && !G.photoMode;
+
+/* ============ 02 渲染器 ============ */
+const app = $('app');
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.25;
+app.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x04050a);
+scene.fog = new THREE.FogExp2(0x04050a, 0.052);
+
+const camera = new THREE.PerspectiveCamera(70, innerWidth/innerHeight, 0.1, 80);
+camera.rotation.order = 'YXZ';
+camera.position.set(0, CFG.eyeHeight, 13.5);
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+/* ============ 03 贴图 & 材质 ============ */
+function makeTex(w, h, fn, repeat){
+  const c = document.createElement('canvas'); c.width=w; c.height=h;
+  fn(c.getContext('2d'), w, h);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  if(repeat){ t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(repeat[0], repeat[1]); }
+  return t;
+}
+
+/* 墙面:发霉的灰泥 */
+const texWall = makeTex(256,256,(g,w,h)=>{
+  g.fillStyle='#252820'; g.fillRect(0,0,w,h);
+  for(let i=0;i<900;i++){ g.fillStyle=`rgba(${R(10,40)|0},${R(12,42)|0},${R(8,30)|0},${R(.06,.2)})`;
+    g.fillRect(R(0,w),R(0,h),R(1,5),R(1,5)); }
+  for(let i=0;i<14;i++){ // 水渍
+    g.fillStyle=`rgba(10,12,8,${R(.05,.14)})`;
+    g.beginPath(); g.ellipse(R(0,w),R(0,h),R(8,34),R(20,70),0,0,7); g.fill(); }
+},[3,1.5]);
+
+/* 地面:旧方砖 */
+const texFloor = makeTex(256,256,(g,w,h)=>{
+  g.fillStyle='#191a1c'; g.fillRect(0,0,w,h);
+  for(let i=0;i<600;i++){ g.fillStyle=`rgba(${R(15,35)|0},${R(15,35)|0},${R(15,38)|0},.25)`;
+    g.fillRect(R(0,w),R(0,h),R(1,4),R(1,4)); }
+  g.strokeStyle='#0c0d0e'; g.lineWidth=3;
+  for(let i=0;i<=2;i++){ g.beginPath(); g.moveTo(i*128,0); g.lineTo(i*128,h); g.stroke();
+    g.beginPath(); g.moveTo(0,i*128); g.lineTo(w,i*128); g.stroke(); }
+},[12,16]);
+
+/* 木材 */
+const texWood = makeTex(256,256,(g,w,h)=>{
+  g.fillStyle='#2a1d13'; g.fillRect(0,0,w,h);
+  for(let x=0;x<w;x+=R(14,30)){ g.fillStyle=`rgba(${R(28,52)|0},${R(18,34)|0},${R(8,18)|0},1)`;
+    g.fillRect(x,0,R(8,22),h);
+    g.strokeStyle='rgba(0,0,0,.35)'; g.beginPath(); g.moveTo(x,0); g.lineTo(x,h); g.stroke(); }
+},[2,2]);
+
+/* 普通纸人脸:不对称细弯眼 + 淡腮红 + 小红唇 */
+const texFace = makeTex(128,128,(g)=>{
+  g.clearRect(0,0,128,128);
+  g.strokeStyle='#141210'; g.lineWidth=4; g.lineCap='round';
+  g.beginPath(); g.moveTo(30,52); g.quadraticCurveTo(42,46,54,52); g.stroke();
+  g.beginPath(); g.moveTo(74,55); g.quadraticCurveTo(86,49,98,55); g.stroke();
+  g.fillStyle='rgba(190,90,90,.28)';
+  g.beginPath(); g.arc(34,74,7,0,7); g.fill();
+  g.beginPath(); g.arc(94,74,7,0,7); g.fill();
+  g.fillStyle='#a01820';
+  g.beginPath(); g.ellipse(64,92,5,6,0,0,7); g.fill();
+});
+
+/* 新娘浓妆:柿蒂纹花钿 + 柳叶吊梢眉 + 细平眼线 + 圆柔腮红 + 眼尾妆泪 + 上扬唇 */
+const texFaceBride = makeTex(256,256,(g)=>{
+  g.clearRect(0,0,256,256);
+  /* 额间花钿:柿蒂纹四瓣花(婚妆与棺椁共用的纹样),整朵50px */
+  g.fillStyle='#a01820';
+  for(let i=0;i<4;i++){
+    g.save();
+    g.translate(128,50); g.rotate(i*Math.PI/2);
+    g.beginPath();
+    g.moveTo(0,4);
+    g.quadraticCurveTo(-13,6, 0,25);
+    g.quadraticCurveTo(13,6, 0,4);
+    g.closePath(); g.fill();
+    g.restore();
+  }
+  g.beginPath(); g.arc(128,50,3,0,7); g.fill();   /* 蕊心 */
+  /* 柳叶吊梢眉:细5px 长70px,眉距32px,中拱尾落 */
+  g.strokeStyle='#141210'; g.lineWidth=5; g.lineCap='round';
+  g.beginPath(); g.moveTo(112,84); g.bezierCurveTo(94,66, 66,62, 46,72);  g.stroke();
+  g.beginPath(); g.moveTo(144,84); g.bezierCurveTo(162,66, 190,62, 210,72); g.stroke();
+  /* 眼线:细长描线(7px),70px 长,极缓上扬——妆,不是睁开的黑眼睛 */
+  g.lineWidth=7;
+  g.beginPath(); g.moveTo(120,128); g.quadraticCurveTo(84,116, 50,114);  g.stroke();
+  g.beginPath(); g.moveTo(136,128); g.quadraticCurveTo(172,116, 206,114); g.stroke();
+  /* 腮红:圆形柔晕,浅透明灰红 */
+  for(const x of [64,192]){
+    const rg = g.createRadialGradient(x,168,3,x,168,26);
+    rg.addColorStop(0,'rgba(190,72,72,.34)'); rg.addColorStop(1,'rgba(190,72,72,0)');
+    g.fillStyle=rg; g.beginPath(); g.arc(x,168,26,0,7); g.fill();
+  }
+  /* 哭花的妆泪:淡痕,眼尾侧起,向外撇下脸颊 */
+  g.strokeStyle='rgba(70,45,45,.34)'; g.lineWidth=4;
+  g.beginPath(); g.moveTo(68,134);  g.quadraticCurveTo(60,168, 56,204);  g.stroke();
+  g.beginPath(); g.moveTo(188,134); g.quadraticCurveTo(196,168, 200,204); g.stroke();
+  /* 点绛唇:嘴角高于唇心,上扬娃娃唇 */
+  g.fillStyle='#a01820';
+  g.beginPath(); g.moveTo(94,192);
+  g.quadraticCurveTo(128,200,162,192);
+  g.quadraticCurveTo(150,214,128,220);
+  g.quadraticCurveTo(106,214,94,192);
+  g.closePath(); g.fill();
+});
+/* 脸部贴图禁用 mipmap:远看花钿花瓣/细眼线不会被缩小版糊成色块 */
+for(const t of [texFace, texFaceBride]){
+  t.minFilter = THREE.LinearFilter;
+  t.generateMipmaps = false;
+}
+
+/* 红纸(对联/帖) */
+function redPaperTex(lines, fontSize=44){
+  return makeTex(128, 512, (g,w,h)=>{
+    g.fillStyle='#6e131c'; g.fillRect(0,0,w,h);
+    for(let i=0;i<200;i++){ g.fillStyle=`rgba(0,0,0,${R(.02,.08)})`; g.fillRect(R(0,w),R(0,h),R(1,3),R(1,3)); }
+    g.fillStyle='#caa86a'; g.textAlign='center'; g.textBaseline='middle';
+    g.font = `${fontSize}px "Songti SC","STSong",serif`;
+    const step = h/(lines.length+0.6);
+    lines.forEach((ch,i)=>g.fillText(ch, w/2, step*(i+0.8)));
+  });
+}
+/* 黄符 */
+const texFu = makeTex(128,256,(g,w,h)=>{
+  g.fillStyle='#b3955c'; g.fillRect(0,0,w,h);
+  g.fillStyle='rgba(0,0,0,.12)';
+  for(let i=0;i<80;i++) g.fillRect(R(0,w),R(0,h),R(1,4),R(1,4));
+  g.fillStyle='#8c1c22'; g.textAlign='center'; g.font='bold 44px "Songti SC",serif';
+  g.fillText('敕',w/2,52); g.fillText('令',w/2,108);
+  g.strokeStyle='#8c1c22'; g.lineWidth=3;
+  g.beginPath(); g.moveTo(30,140); g.quadraticCurveTo(64,120,98,148); g.quadraticCurveTo(60,170,34,150); g.stroke();
+  g.beginPath(); g.moveTo(30,190); g.quadraticCurveTo(64,210,98,186); g.stroke();
+});
+/* 牌位 */
+const texTablet = makeTex(128,192,(g,w,h)=>{
+  g.fillStyle='#3a1512'; g.fillRect(0,0,w,h);
+  g.fillStyle='#caa86a'; g.textAlign='center'; g.font='34px "Songti SC",serif';
+  g.fillText('先',w/2,50); g.fillText('妣',w/2,95); g.fillText('位',w/2,140);
+  g.strokeStyle='#caa86a'; g.lineWidth=2; g.strokeRect(10,8,w-20,h-16);
+});
+
+const matWall  = new THREE.MeshStandardMaterial({map:texWall,  roughness:.95});
+const matFloor = new THREE.MeshStandardMaterial({map:texFloor, roughness:.9});
+const matWood  = new THREE.MeshStandardMaterial({map:texWood,  roughness:.85});
+const matWoodD = new THREE.MeshStandardMaterial({color:0x1c130c, roughness:.9});
+const matPaper = new THREE.MeshStandardMaterial({color:0xd9d3c4, roughness:.95});
+const matFace  = new THREE.MeshStandardMaterial({map:texFace, transparent:true, roughness:.9});
+const matFaceBride = new THREE.MeshStandardMaterial({map:texFaceBride, transparent:true, roughness:.9});
+const matRed   = new THREE.MeshStandardMaterial({color:0x6e131c, roughness:.8});
+const matRedGlow=new THREE.MeshStandardMaterial({color:0x6e131c, emissive:0xff2214, emissiveIntensity:.55, roughness:.7});
+const matStone = new THREE.MeshStandardMaterial({color:0x2e3032, roughness:1});
+const matTablet=new THREE.MeshStandardMaterial({map:texTablet, roughness:.9});
+const matFu    = new THREE.MeshStandardMaterial({map:texFu, roughness:.95, side:THREE.DoubleSide});
+const matGold  = new THREE.MeshStandardMaterial({color:0x8a7350, emissive:0x2a1f0d, emissiveIntensity:.4, roughness:.5, metalness:.6});
+
+/* ============ 04 音频(全程序化) ============ */
+const A = {ctx:null};
+function initAudio(){
+  const ctx = new (window.AudioContext||window.webkitAudioContext)();
+  A.ctx = ctx;
+  A.master = ctx.createGain(); A.master.gain.value = 0.9;
+  const comp = ctx.createDynamicsCompressor();
+  A.master.connect(comp); comp.connect(ctx.destination);
+  /* 白噪声源(雨/风/收音机/雷共用) */
+  const len = ctx.sampleRate*2;
+  const buf = ctx.createBuffer(1,len,ctx.sampleRate);
+  const d = buf.getChannelData(0);
+  for(let i=0;i<len;i++) d[i]=Math.random()*2-1;
+  A.noiseBuf = buf;
+  /* 雨 */
+  const rainSrc = ctx.createBufferSource(); rainSrc.buffer=buf; rainSrc.loop=true;
+  const rainLP = ctx.createBiquadFilter(); rainLP.type='lowpass'; rainLP.frequency.value=750;
+  A.rainGain = ctx.createGain(); A.rainGain.gain.value=0;
+  rainSrc.connect(rainLP); rainLP.connect(A.rainGain); A.rainGain.connect(A.master);
+  rainSrc.start();
+  /* 低鸣 */
+  const o1 = ctx.createOscillator(); o1.frequency.value=52; o1.type='sine';
+  const o2 = ctx.createOscillator(); o2.frequency.value=52.8; o2.type='sine';
+  const dg = ctx.createGain(); dg.gain.value=0.016;
+  o1.connect(dg); o2.connect(dg); dg.connect(A.master);
+  o1.start(); o2.start();
+  /* 夜风:慢呼吸式低频噪声 */
+  const wSrc = ctx.createBufferSource(); wSrc.buffer=buf; wSrc.loop=true; wSrc.playbackRate.value=0.3;
+  const wBP = ctx.createBiquadFilter(); wBP.type='bandpass'; wBP.frequency.value=280; wBP.Q.value=0.8;
+  A.windGain = ctx.createGain(); A.windGain.gain.value=0.015;
+  const wLFO = ctx.createOscillator(); wLFO.frequency.value=0.09;
+  const wLG = ctx.createGain(); wLG.gain.value=0.012;
+  wLFO.connect(wLG); wLG.connect(A.windGain.gain);
+  wSrc.connect(wBP); wBP.connect(A.windGain); A.windGain.connect(A.master);
+  wSrc.start(); wLFO.start();
+  /* 收音机沙沙 */
+  const rSrc = ctx.createBufferSource(); rSrc.buffer=buf; rSrc.loop=true; rSrc.playbackRate.value=0.7;
+  const rBP = ctx.createBiquadFilter(); rBP.type='bandpass'; rBP.frequency.value=1400; rBP.Q.value=0.6;
+  A.radioGain = ctx.createGain(); A.radioGain.gain.value=0;
+  rSrc.connect(rBP); rBP.connect(A.radioGain); A.radioGain.connect(A.master);
+  rSrc.start();
+}
+function env(gainNode, t0, a, peak, dur){
+  const g=gainNode.gain;
+  g.setValueAtTime(0.0001,t0); g.linearRampToValueAtTime(peak,t0+a);
+  g.exponentialRampToValueAtTime(0.0001,t0+dur);
+}
+function burst(filterType, freq, peak, dur, Q=1){
+  if(!A.ctx) return; const ctx=A.ctx, t=ctx.currentTime;
+  const s=ctx.createBufferSource(); s.buffer=A.noiseBuf;
+  const f=ctx.createBiquadFilter(); f.type=filterType; f.frequency.value=freq; f.Q.value=Q;
+  const g=ctx.createGain();
+  s.connect(f); f.connect(g); g.connect(A.master);
+  env(g,t,0.01,peak,dur); s.start(t); s.stop(t+dur+0.1);
+}
+function thump(f0=80,f1=40,peak=0.4,dur=0.35){
+  if(!A.ctx) return; const ctx=A.ctx,t=ctx.currentTime;
+  const o=ctx.createOscillator(); o.type='sine';
+  o.frequency.setValueAtTime(f0,t); o.frequency.exponentialRampToValueAtTime(f1,t+dur);
+  const g=ctx.createGain(); o.connect(g); g.connect(A.master);
+  env(g,t,0.008,peak,dur); o.start(t); o.stop(t+dur+0.1);
+}
+const sfx = {
+  step(){ burst('lowpass', 300+R(-60,60), 0.05, 0.09); },
+  page(){ burst('bandpass', 2200, 0.07, 0.25, 2); },
+  pickup(){ if(!A.ctx)return; const ctx=A.ctx,t=ctx.currentTime;
+    [660,990].forEach((f,i)=>{ const o=ctx.createOscillator(); o.frequency.value=f;
+      const g=ctx.createGain(); o.connect(g); g.connect(A.master);
+      env(g,t+i*0.09,0.02,0.07,0.9); o.start(t); o.stop(t+1.2); }); },
+  bang(){ burst('lowpass',180,0.5,0.5); thump(90,35,0.5,0.5); },
+  sting(){ if(!A.ctx)return; const ctx=A.ctx,t=ctx.currentTime;
+    const o=ctx.createOscillator(); o.type='sawtooth';
+    o.frequency.setValueAtTime(320,t); o.frequency.exponentialRampToValueAtTime(55,t+0.7);
+    const g=ctx.createGain(); o.connect(g); g.connect(A.master);
+    env(g,t,0.01,0.32,0.8); o.start(t); o.stop(t+0.9);
+    burst('highpass',1800,0.25,0.5); thump(100,40,0.4,0.4); },
+  thunder(){ if(!A.ctx)return; const ctx=A.ctx,t=ctx.currentTime;
+    const s=ctx.createBufferSource(); s.buffer=A.noiseBuf; s.loop=true;
+    const f=ctx.createBiquadFilter(); f.type='lowpass';
+    f.frequency.setValueAtTime(420,t); f.frequency.exponentialRampToValueAtTime(90,t+2.6);
+    const g=ctx.createGain(); s.connect(f); f.connect(g); g.connect(A.master);
+    g.gain.setValueAtTime(0.0001,t); g.gain.linearRampToValueAtTime(0.28,t+0.25);
+    g.gain.exponentialRampToValueAtTime(0.0001,t+2.8);
+    s.start(t); s.stop(t+3); },
+  breath(){ for(let i=0;i<3;i++) setTimeout(()=>burst('bandpass',900+R(-200,200),0.05,0.3,3),i*260); },
+  creak(){ if(!A.ctx)return; const ctx=A.ctx,t=ctx.currentTime;
+    const o=ctx.createOscillator(); o.type='sawtooth';
+    o.frequency.setValueAtTime(90,t);
+    o.frequency.linearRampToValueAtTime(150,t+0.35);
+    o.frequency.linearRampToValueAtTime(120,t+0.7);
+    const lp=ctx.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=600;
+    const g=ctx.createGain();
+    o.connect(lp); lp.connect(g); g.connect(A.master);
+    for(let i=0;i<8;i++) g.gain.linearRampToValueAtTime(i%2? 0.008:0.045, t+0.06+i*0.08);
+    g.gain.setValueAtTime(0.0001,t);
+    g.gain.linearRampToValueAtTime(0.0001,t+0.85);
+    o.start(t); o.stop(t+0.9); },
+};
+/* 唢呐(远处,五声) */
+const suona = {on:false, next:0, idx:0,
+  notes:[293.66,349.23,392,440,523.25,523.25,440,392,349.23,293.66,392,440]};
+function suonaTick(){
+  if(!suona.on || !A.ctx) return;
+  const ctx=A.ctx;
+  if(ctx.currentTime < suona.next) return;
+  const t = suona.next || ctx.currentTime;
+  const f = suona.notes[suona.idx % suona.notes.length]; suona.idx++;
+  const o=ctx.createOscillator(); o.type='square'; o.frequency.value=f;
+  const vib=ctx.createOscillator(); vib.frequency.value=5.5;
+  const vg=ctx.createGain(); vg.gain.value=4; vib.connect(vg); vg.connect(o.frequency);
+  const lp=ctx.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=900;
+  const g=ctx.createGain(); o.connect(lp); lp.connect(g); g.connect(A.master);
+  env(g,t,0.06,0.045,0.85);
+  o.start(t); o.stop(t+1); vib.start(t); vib.stop(t+1);
+  suona.next = t + 0.72;
+}
+/* 心跳:周期由事件调节(dlb 0.55 / 终局 0.8 / 平静 1.2~1.4) */
+let hbTimer = 1.4, hbPeriod = 1.4;
+function heartbeatTick(dt){
+  if(!A.ctx) return;
+  hbTimer -= dt;
+  if(hbTimer<=0){ thump(72,45,0.17,0.14); setTimeout(()=>thump(64,42,0.13,0.12),160);
+    hbTimer = hbPeriod; }
+}
+/* 耳语:TTS 音高语速每次微漂,35% 概率叠一声延迟回声——老宅借来的嗓子,越借越旧 */
+function whisper(text, tts=true){
+  subtitle(text, true);
+  if(tts && 'speechSynthesis' in window){
+    try{
+      const clean = text.replace(/[……。,「」]/g,'');
+      const pitch = R(0.05, 0.4), rate = R(0.55, 0.82);
+      const u = new SpeechSynthesisUtterance(clean);
+      u.lang='zh-CN'; u.pitch=pitch; u.rate=rate; u.volume=0.85;
+      speechSynthesis.speak(u);
+      if(Math.random()<0.35){
+        const u2 = new SpeechSynthesisUtterance(clean);
+        u2.lang='zh-CN'; u2.pitch=pitch; u2.rate=rate*0.88; u2.volume=0.4;
+        setTimeout(()=>{ try{ speechSynthesis.speak(u2); }catch(e){} }, 750);
+      }
+    }catch(e){}
+  }
+  sfx.breath();
+}
+
+/* ============ 05 UI ============ */
+let subTimer = null;
+function subtitle(text, isWhisper=false, dur=4.2){
+  const el = $('subtitle');
+  el.textContent = text;
+  el.className = isWhisper ? 'whisper' : '';
+  el.style.opacity = 1;
+  clearTimeout(subTimer);
+  subTimer = setTimeout(()=>{ el.style.opacity=0; }, dur*1000);
+}
+function setObjective(t){ $('objective').textContent = t; }
+function setNotesHud(){ $('notesCount').textContent = `纸条 ${G.notesFound} / 6`; }
+function redFlash(op=0.5){ const el=$('redflash'); el.style.opacity=op; setTimeout(()=>el.style.opacity=0,130); }
+function whiteFlash(){ const el=$('whiteflash'); el.style.opacity=0.5; setTimeout(()=>el.style.opacity=0,80); }
+function fadeBlack(sec=1.6){ $('fader').style.transitionDuration=`${sec}s`; $('fader').style.opacity=1; }
+
+let noteCloseCallback = null;
+function showNote(title, body){
+  G.noteOpen = true;
+  $('noteTitle').textContent = title;
+  $('noteBody').textContent = body;
+  $('noteOverlay').style.display='flex';
+  sfx.page();
+}
+function closeNote(){
+  G.noteOpen = false;
+  $('noteOverlay').style.display='none';
+  sfx.page();
+  if(noteCloseCallback){ const cb=noteCloseCallback; noteCloseCallback=null; cb(); }
+}
+
+/* ============ 06 世界·房(纯几何) ============ */
+const WALL_H = 3.9;
+const colliders = [];   /* 静态 AABB{x1..z2} */
+function wallSeg(x1,x2,z1,z2,mat=matWall,h=WALL_H){
+  const m = new THREE.Mesh(new THREE.BoxGeometry(x2-x1,h,z2-z1), mat);
+  m.position.set((x1+x2)/2, h/2, (z1+z2)/2);
+  scene.add(m);
+  colliders.push({minX:x1,maxX:x2,minZ:z1,maxZ:z2});
+  return m;
+}
+function box(w,h,d,mat,x,y,z,ry=0,parent=scene){
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);
+  m.position.set(x,y,z); m.rotation.y=ry; parent.add(m); return m;
+}
+
+/* ---- 地面 ---- */
+const floorMesh = new THREE.Mesh(new THREE.PlaneGeometry(24.6,32.6), matFloor);
+floorMesh.rotation.x = -Math.PI/2; scene.add(floorMesh);
+const courtyardFloor = new THREE.Mesh(new THREE.PlaneGeometry(8.8,9.8),
+  new THREE.MeshStandardMaterial({color:0x22252a, roughness:1}));
+courtyardFloor.rotation.x = -Math.PI/2;
+courtyardFloor.position.set(0,0.012,-1); scene.add(courtyardFloor);
+
+/*
+  布局(俯视,x 向东,z 向南;玩家从南进门):
+      北 z=-16 ┌────────── 堂屋(终局) ──────────┐
+              │  x -12            0           12│ z=-6
+              │ 西厢房A │  天井(露天/井) │ 东厢房B│
+              ├────────── 长廊(灯笼×2) ─────────┤ z=4
+              │            门厅(入口)           │ z=8
+      南 z=16 └───────────大门(x -1..1)─────────┘
+*/
+wallSeg(-12,-1, 15.85,16.15); wallSeg(1,12, 15.85,16.15);   /* 南(门洞 x-1..1) */
+wallSeg(-12,12,-16.15,-15.85);                              /* 北 */
+colliders.push({minX:-2.5,maxX:2.5,minZ:16.35,maxZ:19});     /* 门外隐形保险:就算门开了,也走不出世界 */
+wallSeg(-12.15,-11.85,-16,16); wallSeg(11.85,12.15,-16,16); /* 东西 */
+wallSeg(-12,-1.5, 7.85,8.15); wallSeg(1.5,12, 7.85,8.15);   /* 门厅/长廊(中门洞) */
+wallSeg(-12,-8.9, 3.85,4.15); wallSeg(-7.5,-1.6, 3.85,4.15);/* 长廊北墙(三门洞) */
+wallSeg(1.6,7.5, 3.85,4.15);   wallSeg(8.9,12, 3.85,4.15);
+wallSeg(-4.65,-4.35,-6,4); wallSeg(4.35,4.65,-6,4);         /* 厢房/天井隔墙 */
+wallSeg(-12,-1.4,-6.15,-5.85); wallSeg(1.4,12,-6.15,-5.85); /* 堂屋南墙(堂门洞 x-1.4..1.4) */
+
+/* 天花板(天井露天) */
+const matCeil = new THREE.MeshStandardMaterial({color:0x14100c, roughness:1});
+for(const [x1,x2,z1,z2] of [[-12,12,8,16],[-12,12,4,8],[-12,-4.5,-6,4],[4.5,12,-6,4],[-12,12,-16,-6]]){
+  const m = new THREE.Mesh(new THREE.BoxGeometry(x2-x1,0.2,z2-z1), matCeil);
+  m.position.set((x1+x2)/2, WALL_H+0.1, (z1+z2)/2); scene.add(m);
+}
+
+/* ---- 门:pivot 在铰链,leaf 沿局部 +x;flip 让 leaf 朝 -x ---- */
+const doors = [];
+function makeDoor(hx, hz, width, opts={}){
+  const pivot = new THREE.Object3D(); pivot.position.set(hx,0,hz); scene.add(pivot);
+  const off = (opts.flip ? -1 : 1) * ((width-0.06)/2+0.03);
+  box(width-0.06, 2.9, 0.09, opts.mat||matWood, off, 1.45, 0, 0, pivot);
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.06,0.015,8,20), matGold);
+  ring.position.set(width*0.72,1.35,0.07); pivot.add(ring);
+  const d = {pivot, open:false, locked:opts.locked||false, target:0,
+    aabb:{minX:Math.min(hx,hx+(opts.flip?-width:width)), maxX:Math.max(hx,hx+(opts.flip?-width:width)),
+          minZ:hz-0.16, maxZ:hz+0.16},
+    openAng:opts.openAng??1.85};
+  doors.push(d); return d;
+}
+const doorEntry = makeDoor(1, 16, 2,   {openAng: 1.5, flip:true});            /* 南大门(开局虚掩) */
+doorEntry.pivot.rotation.y = -1.2; doorEntry.target = -1.2; doorEntry.open = true;
+const doorA     = makeDoor(-8.9, 4, 1.4, {openAng:-1.8});                     /* 西厢房 */
+const doorB     = makeDoor(7.5, 4, 1.4,  {openAng: 1.8});                     /* 东厢房 */
+const doorHallL = makeDoor(-1.4, -6, 1.4, {locked:true, mat:matRed, openAng:-1.7});  /* 堂屋双开(红,锁) */
+const doorHallR = makeDoor(1.4, -6, 1.4,  {locked:true, mat:matRed, openAng: 1.7, flip:true});
+
+/* ---- 家具 · 陈设 ---- */
+/* 门厅:八仙桌 + 长凳 */
+box(2.2,0.12,1.1, matWood, 5,0.86,13.8);
+for(const [lx,lz] of [[4.2,13.4],[5.8,13.4],[4.2,14.2],[5.8,14.2]])
+  box(0.14,0.86,0.14, matWoodD, lx,0.43,lz);
+box(2.6,0.08,0.4, matWood, -4,0.5,12.5);
+function lantern(x,z,y=WALL_H-0.55,light=true){
+  const grp = new THREE.Group(); grp.position.set(x,y,z); scene.add(grp);
+  const s = new THREE.Mesh(new THREE.SphereGeometry(0.28,14,12), matRedGlow);
+  s.scale.y=0.8; grp.add(s);
+  box(0.03,0.3,0.03, matWoodD, 0,0.36,0, 0, grp);
+  box(0.03,0.16,0.03, matWoodD, 0,-0.3,0, 0, grp);
+  if(light){
+    const l = new THREE.PointLight(0xff3820, 9, 8.5, 2);
+    l.position.set(0,-0.1,0); grp.add(l); grp.userData.light = l;
+  }
+  return grp;
+}
+for(const lx of [-8,8]){ const l = lantern(lx,6); l.userData.light.intensity = 4.5; }  /* 长廊灯笼 */
+/* 门洞引路灯:宅子为新娘照的路——它想让你走到堂屋,所以把每道门都点得周到 */
+function thresholdLamp(x,z, color=0xffa860, intensity=4, dist=4.5){
+  const grp = new THREE.Group(); grp.position.set(x,3.25,z); scene.add(grp);
+  const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.12,10,8),
+    new THREE.MeshStandardMaterial({color:0x201510, emissive:color, emissiveIntensity:1.6}));
+  grp.add(bulb);
+  box(0.02,0.35,0.02, matWoodD, 0,0.24,0, 0, grp);   // 灯绳
+  const l = new THREE.PointLight(color, intensity, dist, 2);
+  l.position.y = -0.05; grp.add(l);
+  return grp;
+}
+thresholdLamp(0, 8);                        // 门厅 → 长廊
+thresholdLamp(0, 4);                        // 长廊 → 天井
+thresholdLamp(-8.2, 4, 0xffa860, 3, 3.5);   // 长廊 → 西厢房
+thresholdLamp( 8.2, 4, 0xffa860, 3, 3.5);   // 长廊 → 东厢房
+thresholdLamp( 0, -6, 0xff3820, 2.2, 4);    // 天井 → 堂屋(红,从第一夜就亮着,等你)
+/* 西厢房:床、床头、樟木箱 */
+box(2.4,0.5,1.5, matWood, -10.2,0.25,1.6);
+box(2.2,0.18,1.3, new THREE.MeshStandardMaterial({color:0x4a4440,roughness:1}), -10.2,0.55,1.6);
+box(2.4,1.2,0.14, matWood, -10.2,0.9,0.9);
+box(1.5,0.8,0.85, matWood, -6.5,0.4,-4.6);
+/* 东厢房:书桌、椅、收音机 */
+box(2.0,0.1,1.0, matWood, 9.5,0.82,-3.4);
+for(const [lx,lz] of [[8.7,-3.0],[10.3,-3.0],[8.7,-3.8],[10.3,-3.8]])
+  box(0.12,0.8,0.12, matWoodD, lx,0.41,lz);
+box(0.55,0.9,0.55, matWood, 9.5,0.45,-2.0);
+const radio = box(0.5,0.3,0.3, matWoodD, 9.9,1.02,-3.4);
+radio.userData.dial = box(0.3,0.16,0.02,
+  new THREE.MeshStandardMaterial({color:0x8a7350,emissive:0x6a5220,emissiveIntensity:.35}),
+  0,0.02,0.16, 0, radio);
+/* 天井:古井、水缸 */
+const well = new THREE.Mesh(new THREE.CylinderGeometry(0.85,0.9,0.95,18,1,true), matStone);
+well.position.set(0,0.475,-1.5); scene.add(well);
+const wellRim = new THREE.Mesh(new THREE.TorusGeometry(0.88,0.09,10,24), matStone);
+wellRim.rotation.x = Math.PI/2; wellRim.position.set(0,0.95,-1.5); scene.add(wellRim);
+const wellDark = new THREE.Mesh(new THREE.CircleGeometry(0.8,20), new THREE.MeshBasicMaterial({color:0x000000}));
+wellDark.rotation.x = -Math.PI/2; wellDark.position.set(0,0.55,-1.5); scene.add(wellDark);
+const jar = new THREE.Mesh(new THREE.CylinderGeometry(0.5,0.62,1.0,16),
+  new THREE.MeshStandardMaterial({color:0x1d2b28, roughness:.6}));
+jar.position.set(-3.2,0.5,2.6); scene.add(jar);
+/* 堂屋:供桌、香炉、烛、牌位、盖头、族谱 */
+box(4.4,0.14,1.2, matWood, 0,1.0,-14.6);
+for(const dx of [-2,0,2]) for(const dz of [-0.4,0.4]) box(0.16,1.0,0.16, matWoodD, dx,0.5,-14.6+dz);
+const burner = new THREE.Mesh(new THREE.CylinderGeometry(0.28,0.36,0.3,14),
+  new THREE.MeshStandardMaterial({color:0x4a3b22, roughness:.5, metalness:.5}));
+burner.position.set(0,1.27,-14.6); scene.add(burner);
+box(0.02,0.5,0.02, new THREE.MeshStandardMaterial({color:0xc9a86a}), 0,1.62,-14.65);   /* 香 */
+box(0.09,0.42,0.09, matRedGlow, -0.8,1.28,-14.6);                                       /* 红烛×2 */
+box(0.09,0.42,0.09, matRedGlow,  0.8,1.28,-14.6);
+for(let i=0;i<6;i++){                                                                    /* 牌位 */
+  const t = box(0.34,0.5,0.12, matTablet, -1.5+(i%3)*1.5, 1.39, -15.3-(i>=3?0.55:0));
+  t.rotation.y = Math.PI;
+}
+box(0.5,0.04,0.5, new THREE.MeshStandardMaterial({color:0x8c1c22, roughness:.7, emissive:0x30040a, emissiveIntensity:.5}), 0.55,1.09,-14.35);  /* 红盖头 */
+box(0.42,0.09,0.3, matGold, -0.55,1.12,-14.3);                                           /* 族谱 */
+const hallLightL = new THREE.PointLight(0xff2818, 0, 11, 2); hallLightL.position.set(-1,2.4,-14); scene.add(hallLightL);
+const hallLightR = new THREE.PointLight(0xff2818, 0, 11, 2); hallLightR.position.set(1,2.4,-14);  scene.add(hallLightR);
+const hallLantern = lantern(0,-8.2,WALL_H-0.55,false); hallLantern.visible=false;
+/* 对联(堂屋门)与门厅符纸 */
+function scroll(tex, x, z){
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(0.5,2.6), new THREE.MeshStandardMaterial({map:tex, roughness:.95}));
+  m.position.set(x,1.7,z); scene.add(m); return m;
+}
+scroll(redPaperTex(['百','年','好','合']), -1.9,-5.83);
+scroll(redPaperTex(['永','结','同','心']),  1.9,-5.83);
+const fu1 = new THREE.Mesh(new THREE.PlaneGeometry(0.4,0.9), matFu);
+fu1.position.set(-6,2.2,15.83); fu1.rotation.y=Math.PI; scene.add(fu1);
+const fu2 = fu1.clone(); fu2.position.x=6; scene.add(fu2);
+
+/* ---- 光照 ---- */
+scene.add(new THREE.AmbientLight(0x3a4050, 0.62));
+scene.add(new THREE.HemisphereLight(0x39435a, 0x0a0a0c, 0.6));
+const candleLight = new THREE.PointLight(0xffa050, CFG.candleInt, CFG.candleDist, 2);   /* 玩家的烛 */
+scene.add(candleLight);
+const candleFlame = new THREE.Mesh(new THREE.SphereGeometry(0.02,8,8),
+  new THREE.MeshBasicMaterial({color:0xffd9a0}));
+scene.add(candleFlame);
+
+/* ---- 雨(仅天井上方) ---- */
+const RAIN_N = 420;
+const rainPos = new Float32Array(RAIN_N*6);
+for(let i=0;i<RAIN_N;i++){
+  const x=R(-4.2,4.2), z=R(-5.6,3.6), y=R(0,9);
+  rainPos[i*6]=x; rainPos[i*6+1]=y; rainPos[i*6+2]=z;
+  rainPos[i*6+3]=x; rainPos[i*6+4]=y-0.4; rainPos[i*6+5]=z;
+}
+const rainGeo = new THREE.BufferGeometry();
+rainGeo.setAttribute('position', new THREE.BufferAttribute(rainPos,3));
+scene.add(new THREE.LineSegments(rainGeo,
+  new THREE.LineBasicMaterial({color:0x7d8ba0, transparent:true, opacity:0.34})));
+
+/* ============ 07 纸人 ============ */
+function makePaperFigure(faceMat){
+  const grp = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.2,0.3,1.32,10), matPaper);
+  body.position.y = 0.66; grp.add(body);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.185,14,12), matPaper);
+  head.scale.y = 1.15; head.position.y = 1.5; grp.add(head);
+  const face = new THREE.Mesh(new THREE.PlaneGeometry(0.27,0.27), faceMat || matFace);
+  face.position.set(0,1.5,0.178); grp.add(face);      /* 正面朝 +z */
+  for(const s of [-1,1]){
+    const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.045,0.045,0.72,8), matPaper);
+    arm.position.set(0.26*s,0.95,0); arm.rotation.z = s*0.22; grp.add(arm);
+  }
+  scene.add(grp);
+  return grp;
+}
+const figures = [];
+function addFigure(x,z,ry, opts={}){
+  const grp = makePaperFigure(opts.bride ? matFaceBride : matFace);
+  grp.position.set(x,0,z); grp.rotation.y = ry;
+  grp.visible = opts.visible!==false;
+  const f = {grp, spawn:new THREE.Vector3(x,0,z), stalker:!!opts.stalker, coolT:0};
+  figures.push(f); return f;
+}
+const stalker  = addFigure(-11.2, 6,     Math.PI/2,   {stalker:true, visible:false}); /* 长廊西端:收第1件后现身,只在无人看时逼近 */
+const wingAFig = addFigure(-11.1, -4.9,  Math.PI*0.75,{visible:false});               /* 西厢房角落:读庚帖后 */
+const yardFig  = addFigure(  3.6,  3.1,  Math.PI*1.2, {visible:false});               /* 天井檐下:读庚帖后 */
+for(const zz of [-9.4,-11.4]) for(const xx of [-3.2,-5.4,3.2,5.4]) addFigure(xx,zz,0); /* 堂屋两排,面向入口 */
+const behindFig = addFigure(0,0,0,{bride:true}); behindFig.grp.visible=false;           /* "别回头"专用·浓妆新娘 */
+
+/* ============ 08 聘礼 & 纸条实体 ============ */
+function glowWrap(mesh){
+  mesh.material = mesh.material.clone();
+  mesh.material.emissive = new THREE.Color(0x6a5220);
+  mesh.material.emissiveIntensity = 0.55;
+  return mesh;
+}
+function addGlowLight(mesh, y){    /* 聘礼自带微光:黑屋里也望得见 */
+  const l = new THREE.PointLight(0xffc070, 2.0, 4.5, 2);
+  l.position.copy(mesh.position); l.position.y = y;
+  scene.add(l); mesh.userData.light = l;
+}
+const jiaYiMesh   = glowWrap(box(0.72,0.1,0.5, new THREE.MeshStandardMaterial({color:0x7a1520,roughness:.7}), -10.2,0.7,1.6));  /* 红嫁衣·床上 */
+addGlowLight(jiaYiMesh, 1.2);
+const gengTieMesh = glowWrap(box(0.3,0.02,0.42, new THREE.MeshStandardMaterial({color:0x8c1c22,roughness:.8}), 8.9,0.88,-3.4)); /* 庚帖·书桌 */
+addGlowLight(gengTieMesh, 1.1);
+const xiZhuMesh = glowWrap(box(0.1,0.4,0.1, matRedGlow.clone(), 0.7,1.2,-1.1));                                                  /* 喜烛·井栏 */
+xiZhuMesh.material.emissive = new THREE.Color(0xff5522);
+xiZhuMesh.material.emissiveIntensity = 0.7;
+
+function noteMesh(x,y,z,ry=0){    /* 纸条视觉:一小片纸,不发光,要低头找 */
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(0.22,0.3),
+    new THREE.MeshStandardMaterial({color:0xbfb491, roughness:1, emissive:0x3a3520, emissiveIntensity:.5}));
+  m.rotation.x = -Math.PI/2 + R(-.15,.15); m.rotation.z = ry;
+  m.position.set(x,y,z); scene.add(m); return m;
+}
+/* 纸条位置(与 noteDefs 一一对应,由 STORY_DATA 提供) */
+
+/* ============ 09 玩家 ============ */
+const player = {x:0, z:13.5, yaw:0, pitch:0, bob:0};   /* yaw=0 面向北(-z,屋内) */
+const keys = {};
+let turnAnim = null;       /* Q 快速回头动画 */
+let locked = false, dragging = false;
+
+addEventListener('keydown', e=>{
+  keys[e.code]=true;
+  /* E:合纸条 / 触发互动 */
+  if(e.code==='KeyE'){
+    if(G.noteOpen){ closeNote(); return; }
+    if(currentInteract && canPlay()) currentInteract.use();
+  }
+  /* 堂屋抉择:数字键(主/小键盘) */
+  if(choiceOpen){
+    const n = {'Digit1':1,'Numpad1':1,'Digit2':2,'Numpad2':2,'Digit3':3,'Numpad3':3,'Digit0':0,'Numpad0':0}[e.code];
+    if(n===1)      { ending('A'); closeChoice(); }
+    else if(n===2) { ending('B'); closeChoice(); }
+    else if(n===3) { if(G.notesFound>=6){ ending('C'); closeChoice(); } }
+    else if(n===0) { closeChoice(); }
+  }
+  /* Q:快速回头 180°;J/L:点按式左右转头 45°(无鼠标也能转,自动化/无障碍友好) */
+  if(e.code==='KeyQ' && canPlay() && !turnAnim){
+    turnAnim = {from:player.yaw, to:player.yaw+Math.PI, t:0};
+    sfx.step();
+  }
+  if((e.code==='KeyJ'||e.code==='KeyL') && canPlay() && !turnAnim){
+    turnAnim = {from:player.yaw, to:player.yaw + (e.code==='KeyJ'? Math.PI/4 : -Math.PI/4), t:0};
+  }
+  /* 点按式移动:单次点按迈步(分级试探,被挡退半步);按住平滑走 */
+  if(!e.repeat && canPlay()){
+    const tap = {KeyW:[0,-1],ArrowUp:[0,-1], KeyS:[0,1],ArrowDown:[0,1],
+                 KeyA:[-1,0],ArrowLeft:[-1,0], KeyD:[1,0],ArrowRight:[1,0]}[e.code];
+    if(tap){
+      const s=Math.sin(player.yaw), c=Math.cos(player.yaw);
+      const mx = tap[0]*c + tap[1]*s, mz = -tap[0]*s + tap[1]*c;
+      for(const step of [0.4,0.2,0.1]){
+        const nx = player.x + mx*step;
+        if(!circleHits(nx,player.z,CFG.radius)){ player.x=nx; break; }
+      }
+      for(const step of [0.4,0.2,0.1]){
+        const nz = player.z + mz*step;
+        if(!circleHits(player.x,nz,CFG.radius)){ player.z=nz; break; }
+      }
+      player.bob += 0.3;
+      sfx.step();
+    }
+  }
+  /* P:拍照模式——解锁鼠标、藏 HUD,方便系统截图 */
+  if(e.code==='KeyP' && G.running && !G.ended){
+    G.photoMode = !G.photoMode;
+    if(G.photoMode){
+      try{ document.exitPointerLock && document.exitPointerLock(); }catch(err){}
+      $('hud').style.opacity = 0;
+      $('photoHint').style.display = 'block';
+    } else {
+      try{ renderer.domElement.requestPointerLock(); }catch(err){}
+      $('hud').style.opacity = 1;
+      $('photoHint').style.display = 'none';
+    }
+  }
+});
+addEventListener('keyup', e=>keys[e.code]=false);
+addEventListener('mousedown', ()=>dragging=true);
+addEventListener('mouseup',   ()=>{ dragging=false; lastMX=lastMY=null; });
+let lastMX=null, lastMY=null;
+addEventListener('mousemove', e=>{
+  if(choiceOpen) return;                       /* 抉择时视角冻结,鼠标留给光标 */
+  if(locked){                                  /* 指针锁定:用 movement 位移量 */
+    player.yaw   -= e.movementX*CFG.lookSens;
+    player.pitch -= e.movementY*CFG.lookSens;
+  } else if(dragging){                         /* 拖动兜底:自己算坐标差(不依赖 movementX,自动化环境也能转) */
+    if(lastMX!==null){
+      player.yaw   -= (e.clientX-lastMX)*CFG.lookSens;
+      player.pitch -= (e.clientY-lastMY)*CFG.lookSens;
+    }
+    lastMX=e.clientX; lastMY=e.clientY;
+  } else {
+    lastMX=lastMY=null;
+  }
+  player.pitch = Math.max(-CFG.pitchClamp, Math.min(CFG.pitchClamp, player.pitch));
+});
+document.addEventListener('pointerlockerror', ()=>{
+  if(G.running && !G.ended)
+    subtitle('浏览器没允许锁定鼠标——按住鼠标左键拖动,一样可以转视角。', false, 7);
+});
+document.addEventListener('pointerlockchange', ()=>{
+  locked = document.pointerLockElement === renderer.domElement;
+  if(!locked && G.running && !G.ended && !G.noteOpen && !choiceOpen && !G.photoMode){
+    G.paused = true;
+    $('pause').style.display='flex';
+  }
+  if(locked){ G.paused=false; $('pause').style.display='none'; }
+});
+
+/* ---- 碰撞:静态墙 + 关着的门 ---- */
+function activeAabbs(){
+  const list = colliders.slice();
+  for(const d of doors) if(!d.open) list.push(d.aabb);
+  return list;
+}
+function circleHits(x,z,r){
+  for(const c of activeAabbs()){
+    const cx=Math.max(c.minX,Math.min(x,c.maxX)), cz=Math.max(c.minZ,Math.min(z,c.maxZ));
+    const dx=x-cx, dz=z-cz;
+    if(dx*dx+dz*dz < r*r) return true;
+  }
+  return false;
+}
+/* 自愈:被嵌进任何碰撞体(比如门恰好关在人身上),沿最短方向弹出 */
+function ejectPlayer(){
+  for(const c of activeAabbs()){
+    const cx=Math.max(c.minX,Math.min(player.x,c.maxX));
+    const cz=Math.max(c.minZ,Math.min(player.z,c.maxZ));
+    const dx=player.x-cx, dz=player.z-cz, d2=dx*dx+dz*dz, r=0.32;
+    if(d2 < r*r){
+      if(d2 > 1e-6){
+        const d=Math.sqrt(d2);
+        player.x = cx + dx/d*(r+0.01);
+        player.z = cz + dz/d*(r+0.01);
+      }else{
+        const l=player.x-c.minX, rr=c.maxX-player.x, t=player.z-c.minZ, b=c.maxZ-player.z;
+        const m=Math.min(l,rr,t,b);
+        if(m===l) player.x=c.minX-(r+0.01);
+        else if(m===rr) player.x=c.maxX+(r+0.01);
+        else if(m===t) player.z=c.minZ-(r+0.01);
+        else player.z=c.maxZ+(r+0.01);
+      }
+    }
+  }
+}
+function movePlayer(dt){
+  if(player.z > 16.4) player.z = 15.4;           /* 自愈:已经在门外,请回屋 */
+  ejectPlayer();
+  let vx=0,vz=0;
+  if(keys.KeyW||keys.ArrowUp)    vz-=1;
+  if(keys.KeyS||keys.ArrowDown)  vz+=1;
+  if(keys.KeyA||keys.ArrowLeft)  vx-=1;
+  if(keys.KeyD||keys.ArrowRight) vx+=1;
+  const l=Math.hypot(vx,vz);
+  if(l===0) return;
+  vx/=l; vz/=l;
+  const sp = keys.ShiftLeft||keys.ShiftRight ? CFG.slowSpeed : CFG.walkSpeed;
+  /* 相机 forward=(-sin,−cos),right=(cos,−sin);W→vz=−1 为前进 */
+  const s=Math.sin(player.yaw), c=Math.cos(player.yaw);
+  const mx = vx*c + vz*s, mz = -vx*s + vz*c;
+  const nx = player.x + mx*sp*dt, nz = player.z + mz*sp*dt;
+  if(!circleHits(nx,player.z,CFG.radius)) player.x=nx;
+  if(!circleHits(player.x,nz,CFG.radius)) player.z=nz;
+  player.bob += dt*sp*2.6;
+  stepAcc += dt*sp;
+  if(stepAcc>2.2){ stepAcc=0; sfx.step(); }
+}
+let stepAcc = 0;
+
+/* ============ 10 互动系统 ============ */
+const interactables = [];
+function addInteract(pos, label, use, {radius=CFG.interactRadius, enabled=()=>true}={}){
+  interactables.push({pos:new THREE.Vector3(...pos), label, use, radius, enabled});
+}
+let currentInteract = null;
+function pickInteract(){
+  currentInteract = null;
+  if(!canPlay()) return;
+  const fx=-Math.sin(player.yaw), fz=-Math.cos(player.yaw);
+  let best=null, bestD=1e9;
+  for(const it of interactables){
+    if(!it.enabled()) continue;
+    const dx=it.pos.x-player.x, dz=it.pos.z-player.z;
+    const d=Math.hypot(dx,dz);
+    if(d>it.radius) continue;
+    if((dx*fx+dz*fz)/(d||1) < CFG.facingDot) continue;
+    if(d<bestD){ bestD=d; best=it; }
+  }
+  currentInteract = best;
+  const p=$('prompt');
+  if(best){ p.textContent = `E · ${best.label}`; p.style.opacity=1; }
+  else p.style.opacity=0;
+}
+
+/* ============ 11 剧本数据(纯数据,改文案只动这里) ============ */
+const NOTE_DEFS = [
+  {at:[5,0.93,13.8],      ry:0,   title:'一封电报',
+   body:'泛黄的电报纸,字迹是奶奶的:\n\n「母病 速 归」\n\n落款的日期——是三天前。\n\n可奶奶,已经过世七年了。'},
+  {at:[-6.5,0.82,-4.5],   ry:.4,  title:'奶奶的日记',
+   body:'只剩半本,后面几页被撕掉了。\n\n「王家来提亲了。他家长子……人已经不在了。王家想讨个活人过去,说,只要八字合。」\n\n「合的是阿囡的八字。他们点名,要阿囡。」\n\n「姐姐听见了,哭了半夜。第二天她说:阿嬷,让我去。阿囡还小,她什么都不懂。」\n\n「纸人替身,阿嬷只求王家……认多久,算多久。」'},
+  {at:[-0.5,0.98,-1.2],   ry:0,   title:'井边的信',
+   body:'信纸被雨水泡开了,大半认不出来。只剩最后几行:\n\n「……王家捎话来,说,七载期满。当年的替身,不作数了。」\n\n「对不住。瞒了七年,还是瞒不住了。」\n\n「阿囡,如果你看到这封信——不要进堂屋。」\n\n落款:奶奶。字迹抖得厉害,不像她平时的字。'},
+  {at:[11.5,0.03,5.9],    ry:.9,  title:'褪色的全家福',
+   body:'相片上有四个人:爷爷、奶奶、姐姐——\n\n还有一个孩子。\n\n那个孩子的脸是一团白,像被人用指头反复摩挲过,摩到把五官都磨平了。\n\n你想不起来,自己有没有拍过这张照片。'},
+  {at:[2.3,0.03,-5.4],    ry:.2,  title:'一张红纸条',
+   body:'红纸黑字,是新写的:\n\n「吉时已到,新人未至。」\n\n「未」字被划掉了,改成了「已」。\n\n墨迹,还没有干。'},
+  {at:[-10.85,0.68,1.55], ry:.5,  title:'压在枕头下的信',
+   body:'压在枕头底下,纸都脆了。字迹很轻,像是怕吵醒谁:\n\n「阿囡:\n\n等你长到能读懂这张纸的年纪,姐姐应该已经走了很久了。\n\n不要怪阿嬷。要怪就怪姐姐——是姐姐自己要去的。\n\n那天他们来对八字,你还在睡觉。姐姐说,换我的。\n他们说,换不得,命里写死了的。\n姐姐磨了他们三天三夜。\n\n阿囡,记住三件事:\n不要应声。\n不要接红纸。\n不要回头。\n\n他们认的是八字。可牵你走的,是你的名字。\n\n——姐姐 绝笔」'},
+];
+const noteMeshes = NOTE_DEFS.map(nd => noteMesh(...nd.at, nd.ry));
+
+const ZONES = {
+  foyer:   {x1:-12,x2:12,z1:8,z2:16,   cn:'门厅'},
+  corridor:{x1:-12,x2:12,z1:4,z2:8,    cn:'长廊'},
+  wingA:   {x1:-12,x2:-4.5,z1:-6,z2:4, cn:'西厢房'},
+  wingB:   {x1:4.5,x2:12,z1:-6,z2:4,   cn:'东厢房'},
+  yard:    {x1:-4.5,x2:4.5,z1:-6.9,z2:4, cn:'天井'},
+  hall:    {x1:-12,x2:12,z1:-16,z2:-6.8, cn:'堂屋'},   /* 触发线在门内1m+:关门不会拍到人 */
+};
+function inZone(name){
+  const z=ZONES[name];
+  return player.x>=z.x1&&player.x<=z.x2&&player.z>=z.z1&&player.z<=z.z2;
+}
+
+const ENDINGS = {
+  A: {red:true, lines:[
+    '你伸手,把红盖头捧了起来。',
+    '红布落下来的那一瞬——雨声、唢呐、心跳,全都停了。',
+    '「一拜天地——」',
+    '满堂的纸人,齐声替你应了「是」。',
+    '黑暗里,有人牵住你的手。很凉,但很稳。',
+    '「阿囡,」她说,「姐姐等你,等了很久了。」',
+    '礼成。',
+  ]},
+  B: {red:false, lines:[
+    '你把庚帖凑近香炉的火。',
+    '金字在火光里卷起来。你的生辰八字,一个字一个字地黑掉。',
+    '唢呐声戛然而止。满堂烛火,同时熄灭——',
+    '大门轰然洞开。你跑过天井,跑过长廊,跑出老宅。',
+    '雨停了。天边泛起一线鱼肚白。',
+    '你逃出来了。',
+    '只是手腕上,不知什么时候多了一圈红线。',
+    '很紧。解不开。',
+  ]},
+  C: {red:false, lines:[
+    '族谱翻到最后一页。你的手指,停在那一行小字上:',
+    '「甲申年,王家聘阿囡。八字早合,命里写死。」',
+    '「七年前,婚期将至。长女不忍,泣求代嫁。遂以长女归王氏。」',
+    '旁边一行小注,墨色很新:「替身七载,期满。王氏来迎正主。」',
+    '你把这行小字,看了很久很久。',
+    '然后,你做了一件满堂纸人都没料到的事。',
+    '你拿起了笔。',
+    '「王家听真。」你一边写,一边念出声来:',
+    '「被聘者阿囡,从未应声,从未接红纸。',
+    '此婚,自始不作数。」',
+    '「至于我姐姐——」',
+    '你划去「归王氏」三个字,把她的名字,一笔一画,添回自家这一页。',
+    '「她不归王氏。她归我们家。今天,我接姐姐回家。」',
+    '满堂的纸人,静了很久。然后,齐齐躬下身去——',
+    '不是迎新妇的礼。是送行的礼。',
+    '唢呐声,停了。这一夜,再没有响起来。',
+    '满堂烛火轻轻晃了一下,像有谁,松开了一只攥了二十年的手。',
+    '你抽出三炷香点着,插进香炉;又把她的牌位请下来,抱进怀里。',
+    '「姐姐,回家了。」',
+    '走出堂屋,穿过天井。雨,停了。',
+    '天边泛起一线鱼肚白。你抱着她,一步一步,走出了这扇门。',
+  ]},
+};
+const WHISPER_POOL_EARLY = [
+  '纸人做得,真像。','唢呐在很远的地方响。','你听,井水在涨。',
+  '灯油,续过三回了。','姐姐走的那年,也下这样的雨。','纸人潮了会歪。歪着歪着,就朝人歪。',
+];
+const WHISPER_POOL_LATE  = [
+  '吉时快到了。','他们在数你的脚步。','九寸九……九寸九……','香要换新的了。',
+  '吉时,改了三回了。','井里那面镜子,照不见你。','他们把你的名字,练了很多遍。',
+];
+/* 洗牌袋:整袋听遍才允许重播,消掉轮播感 */
+const whisperBag = {early:[], late:[]};
+function drawWhisper(late){
+  const key = late?'late':'early';
+  if(whisperBag[key].length===0)
+    whisperBag[key] = (late?WHISPER_POOL_LATE:WHISPER_POOL_EARLY).slice().sort(()=>Math.random()-0.5);
+  return whisperBag[key].pop();
+}
+/* 非语言的环境动静:和耳语共用节拍槽,让"声音"不只一种形态 */
+const AMBIENT_EVENTS = [
+  ()=>sfx.creak(),                                                         // 远处一声门轴
+  ()=>thump(1200,700,0.03,0.09),                                           // 井里一声水滴
+  ()=>burst('bandpass',2200,0.03,0.3,2),                                   // 谁在翻纸
+  ()=>{ for(let i=0;i<3;i++) setTimeout(()=>thump(85,55,0.07,0.22), i*420); },  // 三下极轻的敲门
+];
+
+/* ============ 12 剧本逻辑 ============ */
+/* ---- 存档:捡东西自动存;结局即焚 ---- */
+const SAVE_KEY = 'huimen_save_v1';
+const notesTaken = new Array(NOTE_DEFS.length).fill(false);
+const Save = {
+  write(){
+    try{
+      localStorage.setItem(SAVE_KEY, JSON.stringify({
+        pickups:G.pickups, notesTaken,
+        x:player.x, z:player.z, yaw:player.yaw
+      }));
+    }catch(e){}
+  },
+  read(){ try{ return JSON.parse(localStorage.getItem(SAVE_KEY)); }catch(e){ return null; } },
+  clear(){ try{ localStorage.removeItem(SAVE_KEY); }catch(e){} },
+  apply(s){
+    Object.assign(G.pickups, s.pickups||{});
+    G.stage = ['jiaYi','gengTie','xiZhu'].filter(k=>G.pickups[k]).length;   /* 从实物重算,不吃虚数 */
+    (s.notesTaken||[]).forEach((v,i)=>{ if(v && noteMeshes[i]){ noteMeshes[i].visible=false; notesTaken[i]=true; } });
+    G.notesFound = notesTaken.filter(Boolean).length;
+    if(G.pickups.jiaYi){ jiaYiMesh.visible=false; jiaYiMesh.userData.light.visible=false; }
+    if(G.pickups.gengTie){ gengTieMesh.visible=false; gengTieMesh.userData.light.visible=false; }
+    if(G.pickups.xiZhu){ xiZhuMesh.visible=false; if(xiZhuMesh.userData.light) xiZhuMesh.userData.light.visible=false; }
+    if(G.stage>=1) stalker.grp.visible = true;
+    if(G.stage>=2){ wingAFig.grp.visible=true; yardFig.grp.visible=true; }
+    if(typeof s.x==='number'){
+      player.x=s.x; player.z=(s.z<-5.8? -4 : s.z); player.yaw=s.yaw||0;
+    }
+    /* 醒在哪个厢房就把哪扇门敞开——存档不记门,人不能被反锁在自己屋里 */
+    if(player.z>-6 && player.z<4){
+      if(player.x < -4.5){ doorA.open=true; doorA.target=doorA.openAng; }
+      if(player.x >  4.5){ doorB.open=true; doorB.target=doorB.openAng; }
+    }
+    updateObjective(); setNotesHud();
+    if(G.stage>=3) unlockHall({silent:true});
+    subtitle('——接着上回。雨,还没停。——', false, 5);
+  },
+};
+
+/* ---- 目标行 ---- */
+function updateObjective(){
+  setObjective(G.stage<3
+    ? `找齐三件聘礼:红嫁衣 · 庚帖 · 喜烛(${G.stage}/3)`
+    : '堂屋的门,开了。');
+}
+
+/* ---- 堂屋开门(三件聘礼齐;silent 用于读档静默开) ---- */
+function unlockHall({silent=false}={}){
+  if(!doorHallL.locked) return;
+  doorHallL.locked = doorHallR.locked = false;
+  doorHallL.open = doorHallR.open = true;
+  doorHallL.target = doorHallL.openAng; doorHallR.target = doorHallR.openAng;
+  hallLightL.intensity = 13; hallLightR.intensity = 13;
+  hallLantern.visible = true;
+  suona.on = true; if(A.ctx) suona.next = A.ctx.currentTime + 2;
+  if(!silent){
+    thump(50,28,0.5,1.4);
+    burst('lowpass',300,0.2,1.2);
+    whisper('堂屋的门,开了。', true);
+  }
+  updateObjective();
+  Save.write();
+}
+
+/* ---- 门互动 ---- */
+function doorInteract(d){
+  if(d.locked){
+    if(d===doorEntry){ subtitle('推不开。像是从外面顶住了——门外的雨,下得比记忆里大。'); return; }
+    if(d===doorHallL || d===doorHallR){
+      if(G.finale){ subtitle('出不去的。吉时已到。'); return; }
+      const need=[];
+      if(!G.pickups.jiaYi)   need.push('红嫁衣');
+      if(!G.pickups.gengTie) need.push('庚帖');
+      if(!G.pickups.xiZhu)   need.push('喜烛');
+      subtitle(need.length
+        ? `门锁着。门缝里透出红光。红纸上写着:聘礼未齐——还差${need.join('、')}`
+        : '门锁着。门缝里,透出一线红光。');
+    }
+    else subtitle('推不开。');
+    return;
+  }
+  d.open = !d.open;
+  d.target = d.open ? d.openAng : 0;
+  sfx.creak();
+  if(!d.open) setTimeout(()=>burst('lowpass',250,0.2,0.3),400);
+}
+addInteract([0,1.4,16],   '大门',     ()=>doorInteract(doorEntry), {radius:3.0});
+addInteract([-8.2,1.4,4], '厢房的门', ()=>doorInteract(doorA), {radius:CFG.doorRadius});
+addInteract([8.2,1.4,4],  '厢房的门', ()=>doorInteract(doorB), {radius:CFG.doorRadius});
+addInteract([0,1.4,-6],   '堂屋的门', ()=>doorInteract(doorHallL), {radius:2.6});
+
+/* ---- 纸条(一次性的) ---- */
+NOTE_DEFS.forEach((nd, idx)=>{
+  let used = false;
+  addInteract(nd.at, `看 ${nd.title}`, ()=>{
+    if(used) return;
+    used = true;
+    noteMeshes[idx].visible=false;
+    notesTaken[idx]=true;
+    G.notesFound = notesTaken.filter(Boolean).length;
+    hintTimer = 90;                    /* 有进展,指引歇一会儿 */
+    setNotesHud();
+    Save.write();
+    showNote(nd.title, nd.body);
+  }, {enabled:()=>!used});
+});
+
+/* ---- 三件聘礼(一次性的;拿过即退役,防刷) ---- */
+function pickupOnce(pos, label, mesh, flag, after){
+  let used = false;
+  addInteract(pos, label, ()=>{
+    if(used) return;
+    used = true;
+    mesh.visible=false;
+    if(mesh.userData.light) mesh.userData.light.visible=false;
+    G.pickups[flag]=true; sfx.pickup();
+    G.stage = ['jiaYi','gengTie','xiZhu'].filter(k=>G.pickups[k]).length;
+    hintTimer = 90;
+    updateObjective();
+    Save.write();
+    if(G.stage===1) setTimeout(()=>{ stalker.grp.visible=true; }, 2500);
+    if(after) after();
+  }, {enabled:()=>!used});
+}
+pickupOnce([-10.2,0.8,1.6], '拿起 红嫁衣', jiaYiMesh, 'jiaYi', ()=>{
+  setTimeout(()=>whisper('嫁衣上绣着你的小名。', false), 900);
+  setTimeout(()=>whisper('「妹妹,合身吗?」', true), 5200);
+});
+pickupOnce([8.9,0.9,-3.4], '拿起 庚帖', gengTieMesh, 'gengTie', ()=>{
+  showNote('大红庚帖',
+    '大红庚帖,金字:\n\n「坤造:阿囡。生辰八字——」\n\n分毫不差。是你的。\n\n而配婚的那一栏写着:\n\n「乾造:王家长子。\n殁 于 甲 申 年。」');
+  noteCloseCallback = ()=>{
+    whisper('「殁于甲申年」……', true);
+    candleDip = 2.2;
+    wingAFig.grp.visible = true;
+    yardFig.grp.visible = true;
+  };
+});
+pickupOnce([0.7,1.2,-1.1], '拿起 喜烛', xiZhuMesh, 'xiZhu', ()=>{
+  setTimeout(unlockHall, 1400);
+});
+
+/* ---- 收音机 ---- */
+addInteract([9.9,1.05,-3.4], '收音机', ()=>{
+  if(!A.ctx) return;
+  if(G.radioForced){
+    G.radioForced = false;
+    A.radioGain.gain.linearRampToValueAtTime(0, A.ctx.currentTime+0.3);
+    subtitle('沙沙声停了。');
+  } else {
+    G.radioForced = true;
+    A.radioGain.gain.linearRampToValueAtTime(0.06, A.ctx.currentTime+0.5);
+    subtitle('沙沙……沙沙……里面好像有人在数数。');
+    setTimeout(()=>{ if(A.radioGain.gain.value>0.001) whisper('「……七、八、九……新娘的脚,九寸九……」', true); }, 4000);
+  }
+});
+
+/* ---- 区域首入事件 ---- */
+const zoneFirst = {};
+function zoneTick(){
+  for(const name of Object.keys(ZONES)){
+    const z = ZONES[name];
+    if(player.x>=z.x1&&player.x<=z.x2&&player.z>=z.z1&&player.z<=z.z2){
+      $('location').textContent = '— ' + z.cn + ' —';
+      if(!zoneFirst[name]){ zoneFirst[name]=true; onFirstZone(name); }
+      break;
+    }
+  }
+}
+function onFirstZone(name){
+  if(name==='corridor') setTimeout(()=>whisper('雨太大了。进来吧,把门带上。', true), 1500);
+  if(name==='yard')     setTimeout(()=>sfx.thunder(), 800);
+  if(name==='wingA')    subtitle('这间……是姐姐的房间。');
+  if(name==='wingB'){
+    subtitle('书房。收音机还开着——谁在听?');
+    if(A.ctx && !G.radioForced) A.radioGain.gain.linearRampToValueAtTime(0.045, A.ctx.currentTime+1.5);
+  }
+  if(name==='hall') enterFinale();
+}
+/* 大门开局虚掩,11 秒后撞上并锁死(人若还在门洞,缓 2.5 秒再关) */
+function entrySlam(){
+  if(player.z > 15.2){ setTimeout(entrySlam, 2500); return; }
+  if(doorEntry.open){
+    doorEntry.open=false; doorEntry.target=0; doorEntry.locked=true;
+    sfx.bang(); redFlash(0.25);
+    setTimeout(()=>subtitle('……风把门带上了。'),600);
+  }
+}
+
+/* ---- 终局 ---- */
+function enterFinale(){
+  if(G.finale) return;
+  G.finale = true;
+  if(player.z > -6.6) player.z = -6.9;   /* 关门前确认人已进门内 */
+  doorHallL.open=false; doorHallL.target=0; doorHallR.open=false; doorHallR.target=0;
+  doorHallL.locked = true;               /* 进来了,就出不去了 */
+  setTimeout(()=>sfx.bang(), 900);
+  suona.on = true; if(A.ctx) suona.next = A.ctx.currentTime + 2;
+  hbPeriod = 0.8;
+  setTimeout(()=>whisper('吉时,已到。', true), 2200);
+  setTimeout(()=>subtitle('满堂的纸人,都在看着你。', false, 5), 6500);
+  setObjective('走向供桌。');
+}
+let choiceOpen = false, choiceCooldown = 0;
+function openChoice(){
+  if(choiceOpen || G.ended) return;
+  choiceOpen = true;
+  try{ document.exitPointerLock && document.exitPointerLock(); }catch(e){}   /* 鼠标还给玩家 */
+  const c = $('optC');
+  if(G.notesFound < NOTE_DEFS.length){
+    c.classList.add('off');
+    c.querySelector('p').textContent = '被香火熏得发黑,看不清。也许……还有些纸条没找到。';
+  }
+  $('choice').style.display='flex';
+  sfx.breath();
+  subtitle('供桌上,三样东西都在等你。', false, 6);
+}
+function closeChoice(){
+  choiceOpen = false;
+  $('choice').style.display='none';
+  choiceCooldown = 15;
+  try{ renderer.domElement.requestPointerLock(); }catch(e){}
+}
+document.querySelectorAll('.copt').forEach(el=>{
+  el.addEventListener('click', ()=>{
+    const e = el.dataset.e;
+    if(e==='X'){ closeChoice(); return; }
+    if(e==='C' && G.notesFound < NOTE_DEFS.length){ subtitle('看不清。墨被香火熏黑了。'); return; }
+    closeChoice(); ending(e);
+  });
+});
+function ending(which){
+  if(G.ended) return;
+  G.ended = true; G.finale = false;
+  Save.clear();                          /* 了结了,就不留档了 */
+  suona.on = false;
+  if(A.ctx) A.rainGain.gain.linearRampToValueAtTime(0, A.ctx.currentTime+3);
+  fadeBlack(2.2);
+  if(which==='A') sfx.sting();
+  setTimeout(()=>{
+    document.exitPointerLock && document.exitPointerLock();
+    $('hud').style.opacity=0;
+    const E=ENDINGS[which], box=$('endLines'); box.innerHTML='';
+    $('ending').style.display='flex';
+    const step = E.lines.length>14 ? 1800 : 2600;      /* 长结局提速,别让人等一分钟 */
+    E.lines.forEach((ln,i)=>{
+      const d=document.createElement('div');
+      d.textContent=ln;
+      if(E.red && (i===2||i===E.lines.length-1)) d.className='red';
+      box.appendChild(d);
+      setTimeout(()=>{ d.style.opacity=1; }, 1200+i*step);
+    });
+    const showBtn = ()=>{ $('endBtn').style.display='inline-block'; $('ending').onclick=null; };
+    setTimeout(showBtn, 1200+E.lines.length*step+800);
+    /* 不想等?点一下屏幕:全文点亮,按钮立出 */
+    $('ending').addEventListener('click', ()=>{
+      box.querySelectorAll('div').forEach(d=>d.style.opacity=1);
+      showBtn();
+    });
+  }, 2400);
+}
+$('endBtn').onclick = ()=>location.reload();
+
+/* ---- 卡关指引:太久没进展,老宅自己开口指路(每条三种说法,不重样) ---- */
+const HINT_LINES = {
+  jiaYi:  ['「嫁衣……在西厢房,姐姐的床上……」','「西厢房……床上……她替你留着呢……」','「去摸摸那件嫁衣……合身的……」'],
+  gengTie:['「庚帖……在东厢书房的桌上……」','「书房桌上……红帖压着算盘……」','「庚帖在等你……一直等着……」'],
+  xiZhu:  ['「喜烛……在井栏上,井水映着的地方……」','「井栏上的喜烛……替你挡着风……」','「去井边……烛还没湿……」'],
+  hall:   ['「穿过天井,往北……堂屋里,等你……」','「门开了……进来吧……」','「吉时不等人……往北……」'],
+};
+let hintTimer = CFG.hintAfter;
+function hintTick(dt){
+  hintTimer -= dt;
+  if(hintTimer > 0) return;
+  hintTimer = CFG.hintReset;
+  if(G.finale || G.ended || G.noteOpen || !G.running) return;
+  if(G.stage < 3){
+    const keys = [];
+    if(!G.pickups.jiaYi)   keys.push('jiaYi');
+    if(!G.pickups.gengTie) keys.push('gengTie');
+    if(!G.pickups.xiZhu)   keys.push('xiZhu');
+    const vs = HINT_LINES[keys[(Math.random()*keys.length)|0]];
+    whisper(vs[(Math.random()*vs.length)|0], true);
+  } else {
+    const vs = HINT_LINES.hall;
+    whisper(vs[(Math.random()*vs.length)|0], true);
+  }
+}
+
+/* ---- 随机氛围:雷 / 耳语 / "别回头" ---- */
+let candleDip = 0;                        /* 烛火骤暗计时 */
+let nextThunder = R(...CFG.thunderGap);
+let nextWhisperT = R(...CFG.whisperGap);
+let dlb = null;                           /* "别回头"事件状态 */
+let nextDLB = CFG.dlbFirst;
+
+function ambientTick(dt){
+  nextThunder -= dt;
+  if(nextThunder<=0){
+    nextThunder = R(...CFG.thunderGap);
+    whiteFlash();
+    setTimeout(()=>sfx.thunder(), R(500,1600));
+  }
+  nextWhisperT -= dt;
+  if(nextWhisperT<=0){
+    nextWhisperT = R(...CFG.whisperGap);
+    if(G.stage>0 && !G.finale && !G.noteOpen){
+      /* 约 40% 换成非语言的环境动静:声音的形态不重样,轮播感就藏不住脚 */
+      if(Math.random()<0.4){
+        AMBIENT_EVENTS[(Math.random()*AMBIENT_EVENTS.length)|0]();
+      } else {
+        whisper(drawWhisper(G.stage>=2), Math.random()<0.5);
+      }
+    }
+  }
+  dlbTick(dt);
+}
+function dlbTick(dt){
+  nextDLB -= dt;
+  if(nextDLB<=0 && !dlb && G.stage>=1 && !G.finale && !G.noteOpen){
+    dlb = {t:0, yaw0:player.yaw, fired:false};
+    whisper('……别回头。', true);
+    hbPeriod = 0.55;
+  }
+  if(!dlb) return;
+  dlb.t += dt;
+  if(dlb.fired) return;
+  /* 玩家转身了吗(看向正后方)? */
+  let dy = player.yaw - dlb.yaw0 + Math.PI;
+  dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+  if(Math.abs(dy) < CFG.dlbTurnEps){
+    dlb.fired = true;
+    /* 浓妆新娘贴在背后(forward 的反方向) */
+    const bx = player.x + Math.sin(dlb.yaw0)*CFG.dlbBehind;
+    const bz = player.z + Math.cos(dlb.yaw0)*CFG.dlbBehind;
+    behindFig.grp.position.set(bx,0,bz);
+    behindFig.grp.rotation.y = Math.atan2(player.x-bx, player.z-bz);
+    behindFig.grp.visible = true;
+    sfx.sting(); redFlash(0.75); candleDip = 1.6;
+    subtitle('。', false, 0.6);
+    setTimeout(()=>{ behindFig.grp.visible=false; whisper('「说了,别回头。」', true); }, 1300);
+    setTimeout(()=>{ dlb=null; hbPeriod=1.2; nextDLB=R(...CFG.dlbGap); }, 2600);
+  } else if(dlb.t > CFG.dlbWindow){
+    dlb = null; hbPeriod = 1.2; nextDLB = R(...CFG.dlbGap);
+    whisper('「乖。」', true);
+  }
+}
+
+/* ---- 纸人 AI:不看才动 ---- */
+const _frustum = new THREE.Frustum();
+const _m4 = new THREE.Matrix4();
+const _v = new THREE.Vector3();
+function figureTick(dt){
+  camera.updateMatrixWorld();
+  _m4.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+  _frustum.setFromProjectionMatrix(_m4);
+
+  for(const f of figures){
+    if(!f.grp.visible) continue;
+    _v.copy(f.grp.position); _v.y = 1.4;
+    const observed = _frustum.containsPoint(_v);
+    if(!observed){
+      /* 不被看:缓缓转向玩家 */
+      const ty = Math.atan2(player.x - f.grp.position.x, player.z - f.grp.position.z);
+      let d = ty - f.grp.rotation.y;
+      d = Math.atan2(Math.sin(d), Math.cos(d));
+      f.grp.rotation.y += d * Math.min(1, dt*2.2);
+
+      /* 跟踪者:玩家也在长廊时,慢慢逼近 */
+      if(f.stalker && G.stage>=1 && inZone('corridor') && f.coolT<=0){
+        const dx = player.x - f.grp.position.x, dz = player.z - f.grp.position.z;
+        const dist = Math.hypot(dx,dz);
+        if(dist > CFG.stalkerCatch){
+          const sp = CFG.stalkerSpeed*dt;
+          const nx = f.grp.position.x + dx/dist*sp;
+          const nz = f.grp.position.z + dz/dist*sp;
+          if(!circleHits(nx,nz,0.3)){ f.grp.position.x=nx; f.grp.position.z=nz; }
+        } else {
+          /* 被它追上了:贴脸,退回原位歇一阵 */
+          sfx.sting(); redFlash(0.85); candleDip = 2;
+          subtitle('纸人的脸,贴着你的脸。冰的。', false, 5);
+          f.grp.position.copy(f.spawn);
+          f.coolT = CFG.stalkerCool;
+        }
+      }
+    }
+    if(f.coolT>0) f.coolT -= dt;
+  }
+}
+
+/* ============ 13 主循环 ============ */
+let lastT = performance.now();
+function loop(){
+  requestAnimationFrame(loop);
+  const now = performance.now();
+  const dt = Math.min(0.05,(now-lastT)/1000); lastT=now;
+  if(!G.running){ renderer.render(scene,camera); return; }
+  G.time += dt;
+  const active = canPlay();
+
+  if(active) movePlayer(dt);
+
+  /* Q 回头动画(easeInOutQuad) */
+  if(turnAnim){
+    turnAnim.t += dt/CFG.turnDur;
+    const k = Math.min(1, turnAnim.t);
+    const e = k<0.5 ? 2*k*k : 1-Math.pow(-2*k+2,2)/2;
+    player.yaw = turnAnim.from + (turnAnim.to-turnAnim.from)*e;
+    if(k>=1){ player.yaw = turnAnim.to; turnAnim=null; }
+  }
+  camera.position.set(player.x, CFG.eyeHeight + Math.sin(player.bob)*0.032, player.z);
+  camera.rotation.set(player.pitch, player.yaw, 0);
+
+  /* 烛:摇曳 + 缓慢变短 + 事件骤暗 */
+  candleDip = Math.max(0, candleDip-dt);
+  const flick = 0.82 + Math.sin(G.time*11)*0.07 + Math.sin(G.time*23.7)*0.06;
+  const burn = 1 - Math.min(CFG.candleBurnMin, G.time/CFG.candleBurnSec);
+  candleLight.intensity = candleDip>0 ? 2.5 : 15*flick*burn + 3;
+  candleLight.position.set(
+    camera.position.x - Math.sin(player.yaw)*0.28,
+    camera.position.y - 0.42,
+    camera.position.z - Math.cos(player.yaw)*0.28);
+  candleFlame.position.copy(candleLight.position);
+  candleFlame.scale.setScalar(0.8+flick*0.4 + (candleDip>0?-0.5:0));
+
+  /* 门动画 */
+  for(const d of doors){
+    d.pivot.rotation.y += (d.target - d.pivot.rotation.y) * Math.min(1, dt*6);
+  }
+
+  /* 雨声随位置;收音机靠近才响 */
+  if(A.ctx){
+    const target = inZone('yard') ? 0.10 : 0.028;
+    A.rainGain.gain.value += (target - A.rainGain.gain.value)*Math.min(1,dt*2);
+    const rd = Math.hypot(player.x-9.9, player.z+3.4);
+    if(A.radioGain.gain.value>0.001 && !G.radioForced){
+      const rt = rd<7 ? 0.05 : 0.006;
+      A.radioGain.gain.value += (rt - A.radioGain.gain.value)*Math.min(1,dt*1.5);
+    }
+  }
+
+  /* 雨滴下落 */
+  const pa = rainGeo.attributes.position.array;
+  for(let i=0;i<RAIN_N;i++){
+    pa[i*6+1] -= 9.5*dt; pa[i*6+4] -= 9.5*dt;
+    if(pa[i*6+4] < 0){
+      const x=R(-4.2,4.2), z=R(-5.6,3.6), y=R(7,9);
+      pa[i*6]=x; pa[i*6+1]=y; pa[i*6+2]=z; pa[i*6+3]=x; pa[i*6+4]=y-0.4; pa[i*6+5]=z;
+    }
+  }
+  rainGeo.attributes.position.needsUpdate = true;
+
+  /* 世界事件只在玩家可行动时推进(抉择/纸条/暂停=时间冻结) */
+  if(active){
+    zoneTick();
+    ambientTick(dt);
+    hintTick(dt);
+    figureTick(dt);
+    heartbeatTick(dt);
+    suonaTick();
+    pickInteract();
+  } else {
+    $('prompt').style.opacity=0;
+  }
+
+  /* 供桌抉择:走到供桌前弹出 */
+  choiceCooldown = Math.max(0, choiceCooldown-dt);
+  if(G.finale && !G.ended && !choiceOpen && choiceCooldown<=0 && !G.noteOpen && !G.photoMode
+     && player.z < -13 && Math.abs(player.x) < 3){
+    openChoice();
+  }
+  /* 自愈:三件齐了门却锁着(任何原因),自动开 */
+  if(G.stage>=3 && doorHallL.locked && !G.finale && !G.ended){
+    unlockHall();
+  }
+
+  renderer.render(scene, camera);
+}
+loop();
+
+/* ============ 14 启动 ============ */
+/* 验收直通:?stage=3&notes=6 —— 三件聘礼齐、前 N 张纸条已读、人站在堂屋门前 */
+function applyElevator(q){
+  const st = parseInt(q.get('stage')||'0',10);
+  if(st<=0) return false;
+  const wantNotes = parseInt(q.get('notes')||'0',10);
+  const nt = new Array(NOTE_DEFS.length).fill(false);
+  for(let i=0;i<wantNotes && i<nt.length;i++) nt[i]=true;
+  Save.apply({stage:st,
+    pickups: st>=3? {jiaYi:true,gengTie:true,xiZhu:true}
+           : st===2? {jiaYi:true,gengTie:true} : {jiaYi:true},
+    notesTaken:nt,
+    x:0, z:-2, yaw:0});
+  return true;
+}
+function start(){
+  $('title').style.display='none';
+  $('hud').style.opacity=1;
+  G.running=true;
+  initAudio();
+  updateObjective();
+  const q = new URLSearchParams(location.search);
+  if(!applyElevator(q)){
+    const sv = Save.read();
+    if(sv && ((sv.pickups&&Object.values(sv.pickups).some(Boolean)) || (sv.notesTaken||[]).some(Boolean))){
+      Save.apply(sv);
+    }
+  }
+  setTimeout(()=>subtitle('门虚掩着。像是等了你很久。', false, 5), 800);
+  setTimeout(()=>subtitle('往前走。W,或者 ↑。', false, 6), 6500);
+  setTimeout(entrySlam, 11000);
+  setTimeout(()=>{ if(!G.ended) whisper('回来了就好。回来了,就好。', true); }, 22000);
+}
+$('startBtn').addEventListener('click', ()=>{
+  start();
+  renderer.domElement.requestPointerLock();
+});
+$('title').addEventListener('click', e=>{
+  if(e.target.id!=='startBtn'){ start(); renderer.domElement.requestPointerLock(); }
+});
+$('pause').addEventListener('click', ()=>{
+  renderer.domElement.requestPointerLock();
+});
+$('restartBtn').addEventListener('click', e=>{
+  e.stopPropagation();            /* 别触发"继续"的重锁 */
+  Save.clear(); location.reload();
+});
+$('freshBtn').addEventListener('click', ()=>{ Save.clear(); location.reload(); });
+/* 有存档:标题页显示"从头再来",并把主按钮改成"接着上回" */
+{
+  const sv = Save.read();
+  if(sv && ((sv.pickups&&Object.values(sv.pickups).some(Boolean)) || (sv.notesTaken||[]).some(Boolean))){
+    $('freshBtn').style.display='inline-block';
+    $('startBtn').textContent = '回 家 · 接 着 上 回';
+  }
+}
+/* 调试入口:?auto / #auto 直接进场景(不锁指针)。
+   传参:&x=&z=&yaw= 传送机位;&veil 把新娘纸人摆在眼前 2.5 米;?stage=N&notes=N 验收直通 */
+if(location.hash==='#auto' || location.search.includes('auto')){
+  $('title').style.display='none';
+  $('hud').style.opacity=1;
+  G.running=true;
+  updateObjective();
+  const q = new URLSearchParams(location.search);
+  if(q.get('x')!==null)   player.x = parseFloat(q.get('x'));
+  if(q.get('z')!==null)   player.z = parseFloat(q.get('z'));
+  if(q.get('yaw')!==null) player.yaw = parseFloat(q.get('yaw'));
+  applyElevator(q);       /* ?auto&stage=3&notes=6:调试流也支持直达 */
+  if(location.search.includes('photo')){   /* &photo:开机即拍照模式(调试) */
+    G.photoMode = true;
+    $('hud').style.opacity = 0;
+    $('photoHint').style.display = 'block';
+  }
+  if(location.search.includes('veil')){
+    behindFig.grp.visible = true;
+    behindFig.grp.position.set(player.x, 0, player.z-CFG.dlbBehind);   /* 与"别回头"实战同距 */
+    behindFig.grp.rotation.y = 0;      /* 正面朝向玩家(玩家默认朝 -z) */
+  }
+}
+</script>
+</body>
+</html>
